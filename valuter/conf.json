@@ -1,0 +1,87 @@
+{
+    "block-explorer": {
+        "tx-hash":"https://www.mintscan.io/cosmos/txs/%s",
+        "account":"https://www.mintscan.io/cosmos/account/%s",
+        "validator":"https://www.mintscan.io/cosmos/validators/%s"
+    },
+
+    "tasks":{
+        
+        "validators-genesis": {
+            "max-winners" : 125,
+            "reward": 500,
+            "uptime-percent": 0.50
+        },
+        "validators-joined": {
+            "max-winners" : 125,
+            "reward": 500,
+            "uptime-percent": 0.50
+        },
+       
+        "jail-unjail": {
+            "max-winners" : 125,
+            "reward": 500
+        },
+        "staking": {
+            "max-winners" : 500,
+            "reward": 500
+        },
+        "gov": {
+            "max-winners" : 10,
+            "proposals": [1,2,3],
+            "reward": 480          
+        },
+        "node-upgrade": {
+            "max-winners" : 10,
+            "reward": 480,
+            "condition": {
+                "upgrade-hight": 1000
+            }
+        },
+        "uptime": {
+            "max-winners" : 160,
+            "reward": 480,
+            "conditions": [{
+                "start-hight": 195947,
+                "end-hight": 198299,
+                "uptime-percent": 0.10
+            }]
+        },
+        "contracts-max-rewards": {
+            "max-winners" : 25,
+            "reward": 1,
+            "condition": {
+                "start-hight": 1,
+                "end-hight": 494133
+            }
+        },
+        "contracts-subsidize-users-fees": {
+            "max-winners" : 25,
+            "reward": 1,
+            "condition": {
+                "start-hight": 1,
+                "end-hight": 494133
+            }
+        }
+    },
+
+    "bech32-prefix" : {
+        "account" :{
+            "address": "celestia",
+            "pubkey": "celestiapub"
+        },
+        "validator" :{
+            "address": "celestiavaloper",
+            "pubkey": "celestiavaloperpub"
+        },
+        "consensus" :{
+            "address": "celestiavalcons",
+            "pubkey": "celestiavalconspub"
+        }
+    },
+
+    "api":{
+        "rows-per-page" : 200
+    }
+
+}

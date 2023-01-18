@@ -1,0 +1,26 @@
+{
+    "grpc":{
+        "api_call_retry": 20,
+        "call_timeout": 30
+    },
+
+    "tendermint_client": {
+        "subscriber_name":"cosmologger",
+        "connect_retry": 60
+    },
+
+    "bech32_prefix" : {
+        "account" :{
+            "address": "celestia",
+            "pubkey": "celestiapub"
+        },
+        "validator" :{
+            "address": "celestiavaloper",
+            "pubkey": "celestiavaloperpub"
+        },
+        "consensus" :{
+            "address": "celestiavalcons",
+            "pubkey": "celestiavalconspub"
+        }
+    }
+}

@@ -1,0 +1,343 @@
+version: '3.6'
+services:
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus
+    networks:
+      - celestialocal
+    ports:
+      - ${PROMETHEUS_PORT}:${PROMETHEUS_PORT}
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+    command: --web.enable-lifecycle  --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d
+  
+  #----------------#
+
+  otel-collector:
+    container_name: otel-collector
+    image: otel/opentelemetry-collector
+    command: ["--config=/root/otel-collector/config.yml"]
+    volumes:
+      - ./otel-collector:/root/otel-collector/
+    networks:
+      - celestialocal
+    ports:
+      - ${OTEL_GRPC_PORT}:${OTEL_GRPC_PORT}
+      - ${OTEL_HTTP_PORT}:${OTEL_HTTP_PORT}
+      - ${OTEL_PROMETHEUS_EXPORTER}:${OTEL_PROMETHEUS_EXPORTER}
+      # - "55681:55681"
+
+  #----------------#
+
+  leaderboard-backend:
+    image: mojiz/leaderboard-backend:latest
+    container_name: leaderboard-backend
+    build:
+      context: ./leaderboard-backend
+    ports: 
+      - ${LEADERBOARD_REST_API_PORT}:${LEADERBOARD_REST_API_PORT}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    networks:
+      - celestialocal
+    environment:
+      LOG_LEVEL: ${LEADERBOARD_LOG_LEVEL}
+      PROMETHEUS_URL: ${PROMETHEUS_URL}
+      APP_NODE_GRPC: "${CORE_IP}:${CORE_GRPC_PORT}"
+      APP_NODE_GRPC_TLS: ${APP_NODE_GRPC_TLS}
+      APP_TM_RPC: "http://${CORE_IP}:${CORE_RPC_PORT}"
+      API_CALL_RETRY: ${LEADERBOARD_API_CALL_RETRY}
+      API_CALL_TIMEOUT: ${LEADERBOARD_API_CALL_TIMEOUT}
+      PROMETHEUS_SYNC_INTERVAL: ${LEADERBOARD_PROMETHEUS_SYNC_INTERVAL}
+      VALIDATOR_SYNC_INTERVAL: ${LEADERBOARD_VALIDATOR_SYNC_INTERVAL}
+      TENDERMINT_SYNC_INTERVAL: ${LEADERBOARD_TENDERMINT_SYNC_INTERVAL}
+      API_ROWS_PER_PAGE: ${LEADERBOARD_API_ROWS_PER_PAGE}
+      REST_API_ADDRESS: ${LEADERBOARD_REST_API_ADDRESS}
+      IP_INFO_API_KEY: ${LEADERBOARD_IP_INFO_API_KEY}
+      DEMO: ${LEADERBOARD_DEMO}
+      ORIGIN_ALLOWED: ${LEADERBOARD_ORIGIN_ALLOWED}
+    healthcheck:
+      test: curl --fail http://leaderboard-backend:${LEADERBOARD_REST_API_PORT}/ || exit 1
+      interval: 30s
+      retries: 10 # Will try for 5 minutes      
+    restart: always
+    security_opt:
+      - "seccomp:unconfined"
+
+  #----------------#
+  valuter:
+    image: mojiz/valuter:latest
+    container_name: valuter
+    build:
+      context: ./valuter
+    ports: 
+      - ${VALUTER_PORT}:${VALUTER_PORT}
+      - 2346:2345
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    volumes:
+      - ./valuter/conf.json:/app/conf.json
+    networks:
+      - celestialocal
+    environment:
+      SERVING_ADDR: ${VALUTER_SERVING_ADDR:-:8080} 
+      POSTGRES_DB: ${POSTGRES_DB:-tmp}
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+    healthcheck:
+      test: curl --fail http://localhost:${VALUTER_PORT} || exit 1
+      interval: 30s
+      retries: 10 # Will try for 5 minutes      
+    restart: always
+    security_opt:
+      - "seccomp:unconfined"
+
+  # #----------------#
+
+  cosmologger:
+    image: mojiz/cosmologger:latest
+    container_name: cosmologger
+    build:
+      context: ./cosmologger
+    depends_on: 
+      - postgres
+    ports: 
+      - 2345:2345
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    volumes:
+      - ./cosmologger:/go/src/app  # We need it for development
+      - ./cosmologger/conf.json:/app/conf.json
+    networks:
+      - celestialocal
+    environment:
+      RPC_ADDRESS: ${RPC_ADDRESS:-}
+      GRPC_ADDRESS: ${GRPC_ADDRESS:-}
+      GRPC_TLS: ${GRPC_TLS:-false}
+      POSTGRES_DB: ${POSTGRES_DB:-tmp}
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      DATA_COLLECTION_MODE: ${DATA_COLLECTION_MODE:-event}
+    healthcheck:
+      test: ps -a | grep  app | grep -v grep || exit 1
+      interval: 30s
+      retries: 10 # Will try for 5 minutes      
+    restart: always
+    security_opt:
+      - "seccomp:unconfined"
+
+  #----------------#
+
+  celestia-app:
+    image: mojiz/celestia-app:${APP_GIT_TAG}
+    container_name: celestia-app
+    build:
+      context: ./celestia-app
+      args:
+        APP_GIT_TAG: ${APP_GIT_TAG}
+    ports: 
+      - ${CORE_GRPC_PORT}:${CORE_GRPC_PORT}
+      - ${CORE_RPC_PORT}:${CORE_RPC_PORT}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    volumes:
+      - celestia-app-data:${APP_HOME_DIR}
+    networks:
+      - celestialocal
+    environment:
+      APP_HOME_DIR: ${APP_HOME_DIR}
+      DENOM: ${DENOM}
+      VALIDATOR_KEY: ${VALIDATOR_KEY}
+      FUND_AMOUNT: ${FUND_AMOUNT}
+      CHAINID: ${CHAINID}
+      KEYRING_BACKEND: ${KEYRING_BACKEND}
+      CORE_IP: ${CORE_IP}
+      CORE_RPC_PORT: ${CORE_RPC_PORT}
+      CORE_GRPC_PORT: ${CORE_GRPC_PORT}
+      NODE_KEY: ${NODE_KEY}
+      NODE_EXPORTED_KEY_FILE: ${NODE_EXPORTED_KEY_FILE}
+    healthcheck:
+      test: curl --fail http://${CORE_IP}:${CORE_RPC_PORT}/ || exit 1
+      interval: 30s
+      retries: 10 # Will try for 5 minutes      
+    restart: always
+    security_opt:
+      - "seccomp:unconfined"
+
+  #----------------#
+  celestia-node:
+    image: mojiz/celestia-node:${NODE_GIT_TAG}
+    container_name: celestia-node
+    build:
+      context: ./celestia-node
+      args:
+        NODE_GIT_TAG: ${NODE_GIT_TAG}
+    ports:
+      - ${NODE_REST_PORT}:${NODE_REST_PORT}
+      - ${NODE_RPC_PORT}:${NODE_RPC_PORT}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    volumes:
+      - celestia-node-data:/data
+      - celestia-app-data:/data/apphome
+    networks:
+      - celestialocal
+    environment:
+      NODE_HOME_DIR: "/data/.celestia-${NODE_TYPE}-${CHAINID}"
+      NODE_TYPE: ${NODE_TYPE}
+      FUND_AMOUNT: ${FUND_AMOUNT}
+      CHAINID: ${CHAINID}
+      KEYRING_BACKEND: ${KEYRING_BACKEND}
+      APP_HOME_DIR: "/data/apphome"
+      CORE_IP: ${CORE_IP}
+      CORE_RPC_PORT: ${CORE_RPC_PORT}
+      CORE_GRPC_PORT: ${CORE_GRPC_PORT}
+      NODE_KEY: ${NODE_KEY}
+      NODE_EXPORTED_KEY_FILE: ${NODE_EXPORTED_KEY_FILE}
+      METRICS_ENDPOINT: ${METRICS_ENDPOINT}
+      NODE_RPC_URL: ${NODE_RPC_URL}
+      NODE_REST_URL: ${NODE_REST_URL}
+      NODE_REST_PORT: ${NODE_REST_PORT}
+      NODE_REST_HOST: ${NODE_REST_HOST}
+    healthcheck:
+      test: curl --fail http://${CORE_IP}:${CORE_RPC_PORT}/ || exit 1
+      interval: 30s
+      retries: 10 # Will try for 5 minutes      
+    restart: always
+    security_opt:
+      - "seccomp:unconfined"
+
+  #----------------#
+
+  nodelogger:
+    image: mojiz/nodelogger:latest
+    container_name: nodelogger
+    depends_on: 
+      - postgres
+    ports: 
+      - 2348:2345
+      - ${NODELOGGER_REST_API_PORT}:${NODELOGGER_REST_API_PORT}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    volumes:
+      - ./nodelogger:/go/src/app  # We need it for development
+    networks:
+      - celestialocal
+    environment:
+      LOG_LEVEL: ${NODELOGGER_LOG_LEVEL}
+      PROMETHEUS_URL: ${PROMETHEUS_URL}
+      PROMETHEUS_SYNC_INTERVAL: ${NODELOGGER_PROMETHEUS_SYNC_INTERVAL}
+      API_ROWS_PER_PAGE: ${NODELOGGER_API_ROWS_PER_PAGE}
+      REST_API_ADDRESS: ${NODELOGGER_REST_API_ADDRESS}
+      DEMO: ${NODELOGGER_DEMO:-false}
+      ORIGIN_ALLOWED: ${NODELOGGER_ORIGIN_ALLOWED}
+      POSTGRES_DB: ${POSTGRES_DB:-tmp}
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+    healthcheck:
+      test: curl --fail http://nodelogger:${NODELOGGER_REST_API_PORT}/ || exit 1
+      interval: 30s
+      retries: 10 # Will try for 5 minutes      
+    restart: always
+    security_opt:
+      - "seccomp:unconfined"
+
+  #----------------#
+
+  random-pfd:
+    image: mojiz/random-pfd:latest
+    container_name: random-pfd
+    build:
+      context: ./random-pfd
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    networks:
+      - celestialocal
+    environment:
+      NODE_REST_URL: ${NODE_REST_URL}
+    restart: always
+    security_opt:
+      - "seccomp:unconfined"
+
+  #----------------#
+
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tmp}
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+    networks:
+      - celestialocal
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "postgres", "-U", "root" ]
+      timeout: 45s
+      interval: 10s
+      retries: 10
+    restart: always
+
+
+  #----------------#
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    depends_on: 
+      - postgres
+    ports:
+      - "${PGADMIN_PORT}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+       - ./pgadmin:/root/.pgadmin
+    networks:
+      - celestialocal
+    restart: unless-stopped
+
+  #----------------# 
+
+volumes:
+  prometheus-data:
+  postgres-db:
+  celestia-app-data:
+  celestia-node-data:
+
+
+networks:
+  celestialocal:
+    driver: bridge

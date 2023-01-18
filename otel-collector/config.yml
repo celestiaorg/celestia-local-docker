@@ -1,0 +1,38 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "otel-collector:4317"
+      http:
+        endpoint: "otel-collector:4318"
+        # cors_allowed_origins:
+        #   - "*"
+
+# processors:
+#   batch:
+
+exporters:
+  logging:
+    logLevel: debug
+  prometheusremotewrite:
+    endpoint: https://<userid>:<API_KEY>@prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push
+  prometheus:
+    endpoint: "otel-collector:8889"
+    # namespace: "default"
+    # const_labels:
+    #   label1: value1
+    #   'another label': spaced value
+    send_timestamps: true
+    metric_expiration: 1800m
+    # resource_to_telemetry_conversion:
+    #   enabled: true
+
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      # processors: [batch]
+      # exporters: [logging]
+      # exporters: [prometheusremotewrite]
+      exporters: [prometheus]
