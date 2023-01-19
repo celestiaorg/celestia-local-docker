@@ -1,6 +1,7 @@
-# Celestia all-in-one is a minimal local setup for Celestia tool chains with metrics
+# Celestia all-in-one docker
 
-This bundle sets up the following tools and configures them to work together in a local environment:
+This bundle is a minimal local setup for Celestia tool chains with metrics.
+It sets up the following tools and configures them to work together in a local environment:
 
 * [Celestia-app](https://github.com/celestiaorg/celestia-app)
 * [Celestia-node](https://github.com/celestiaorg/celestia-node/)
