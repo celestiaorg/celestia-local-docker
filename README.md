@@ -213,3 +213,7 @@ To remove containers and their data run the following command
 docker-compose down
 docker volume rm `docker volume ls -q | grep "celestia-local-docker_"`
 ```
+
+## How the different parts of the whole system interact with each other
+
+![diagram](./docs/diagram.png)
