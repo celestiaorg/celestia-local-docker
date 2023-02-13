@@ -6,7 +6,7 @@ services:
     networks:
       - celestialocal
     ports:
-      - ${PROMETHEUS_PORT}:${PROMETHEUS_PORT}
+      - 9093:${PROMETHEUS_PORT}
     volumes:
       - ./prometheus:/etc/prometheus
       - prometheus-data:/prometheus
@@ -171,8 +171,7 @@ services:
       CORE_IP: ${CORE_IP}
       CORE_RPC_PORT: ${CORE_RPC_PORT}
       CORE_GRPC_PORT: ${CORE_GRPC_PORT}
-      NODE_KEY: ${NODE_KEY}
-      NODE_EXPORTED_KEY_FILE: ${NODE_EXPORTED_KEY_FILE}
+      NODE_EXPORTED_KEY_FILE_POSTFIX: ${NODE_EXPORTED_KEY_FILE_POSTFIX}
     healthcheck:
       test: curl --fail http://${CORE_IP}:${CORE_RPC_PORT}/ || exit 1
       interval: 30s
@@ -182,16 +181,66 @@ services:
       - "seccomp:unconfined"
 
   #----------------#
-  celestia-node:
+
+  celestia-bridge:
     image: mojiz/celestia-node:${NODE_GIT_TAG}
-    container_name: celestia-node
+    container_name: ${BRIDGE_NODE_REST_HOST}
     build:
       context: ./celestia-node
       args:
         NODE_GIT_TAG: ${NODE_GIT_TAG}
     ports:
-      - ${NODE_REST_PORT}:${NODE_REST_PORT}
-      - ${NODE_RPC_PORT}:${NODE_RPC_PORT}
+      - ${BRIDGE_NODE_REST_PORT}:${DEFAULT_NODE_REST_PORT}
+      - ${BRIDGE_NODE_RPC_PORT}:${DEFAULT_NODE_RPC_PORT}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    volumes:
+      - celestia-node-data:/data
+      - celestia-app-data:/data/apphome
+    networks:
+      - celestialocal
+    entrypoint: "tail -f /dev/null"
+    environment:
+      NODE_HOME_DIR: "/data/.celestia-bridge-${CHAINID}"
+      NODE_TYPE: ${BRIDGE_NODE_TYPE}
+      NODE_KEY: ${BRIDGE_NODE_KEY}
+      NODE_EXPORTED_KEY_FILE_POSTFIX: ${NODE_EXPORTED_KEY_FILE_POSTFIX}
+      FUND_AMOUNT: ${FUND_AMOUNT}
+      CHAINID: ${CHAINID}
+      KEYRING_BACKEND: ${KEYRING_BACKEND}
+      APP_HOME_DIR: "/data/apphome"
+      CORE_IP: ${CORE_IP}
+      CORE_RPC_PORT: ${CORE_RPC_PORT}
+      CORE_GRPC_PORT: ${CORE_GRPC_PORT}
+      METRICS_ENDPOINT: ${METRICS_ENDPOINT}
+      NODE_RPC_URL: ${BRIDGE_NODE_RPC_URL}
+      NODE_REST_URL: ${BRIDGE_NODE_REST_URL}
+      NODE_REST_PORT: ${DEFAULT_NODE_REST_PORT}
+      NODE_REST_HOST: ${BRIDGE_NODE_REST_HOST}
+    healthcheck:
+      test: curl --fail ${BRIDGE_NODE_REST_URL} || exit 1
+      interval: 30s
+      retries: 10 # Will try for 5 minutes      
+    restart: always
+    security_opt:
+      - "seccomp:unconfined"
+
+  #----------------#
+
+  celestia-light:
+    image: mojiz/celestia-node:${NODE_GIT_TAG}
+    container_name: ${LIGHT_NODE_REST_HOST}
+    build:
+      context: ./celestia-node
+      args:
+        NODE_GIT_TAG: ${NODE_GIT_TAG}
+    entrypoint: "tail -f /dev/null"
+    ports:
+      - ${LIGHT_NODE_REST_PORT}:${DEFAULT_NODE_REST_PORT}
+      - ${LIGHT_NODE_RPC_PORT}:${DEFAULT_NODE_RPC_PORT}
     logging:
       driver: "json-file"
       options:
@@ -203,8 +252,10 @@ services:
     networks:
       - celestialocal
     environment:
-      NODE_HOME_DIR: "/data/.celestia-${NODE_TYPE}-${CHAINID}"
-      NODE_TYPE: ${NODE_TYPE}
+      NODE_HOME_DIR: "/data/.celestia-bridge-${CHAINID}"
+      NODE_TYPE: ${LIGHT_NODE_TYPE}
+      NODE_KEY: ${LIGHT_NODE_KEY}
+      NODE_EXPORTED_KEY_FILE_POSTFIX: ${NODE_EXPORTED_KEY_FILE_POSTFIX}
       FUND_AMOUNT: ${FUND_AMOUNT}
       CHAINID: ${CHAINID}
       KEYRING_BACKEND: ${KEYRING_BACKEND}
@@ -212,20 +263,19 @@ services:
       CORE_IP: ${CORE_IP}
       CORE_RPC_PORT: ${CORE_RPC_PORT}
       CORE_GRPC_PORT: ${CORE_GRPC_PORT}
-      NODE_KEY: ${NODE_KEY}
-      NODE_EXPORTED_KEY_FILE: ${NODE_EXPORTED_KEY_FILE}
       METRICS_ENDPOINT: ${METRICS_ENDPOINT}
-      NODE_RPC_URL: ${NODE_RPC_URL}
-      NODE_REST_URL: ${NODE_REST_URL}
-      NODE_REST_PORT: ${NODE_REST_PORT}
-      NODE_REST_HOST: ${NODE_REST_HOST}
+      NODE_RPC_URL: ${LIGHT_NODE_RPC_URL}
+      NODE_REST_URL: ${LIGHT_NODE_REST_URL}
+      NODE_REST_PORT: ${DEFAULT_NODE_REST_PORT}
+      NODE_REST_HOST: ${LIGHT_NODE_REST_HOST}
     healthcheck:
-      test: curl --fail http://${CORE_IP}:${CORE_RPC_PORT}/ || exit 1
+      test: curl --fail ${LIGHT_NODE_REST_URL} || exit 1
       interval: 30s
       retries: 10 # Will try for 5 minutes      
     restart: always
     security_opt:
       - "seccomp:unconfined"
+
 
   #----------------#
 

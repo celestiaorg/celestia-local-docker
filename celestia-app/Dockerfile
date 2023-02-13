@@ -27,7 +27,7 @@ RUN apk add bash curl
 
 WORKDIR /app/
 COPY --from=development /build .
-COPY ./start.sh ./clean.sh ./keys.sh ./
+COPY ./start.sh ./keys.sh ./
 
 ENV BIN_PATH="/app/celestia-appd"
 
