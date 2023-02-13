@@ -44,6 +44,8 @@ services:
         max-file: "10"
     networks:
       - celestialocal
+    volumes:
+      - leaderboard-cache:/app/cache
     environment:
       LOG_LEVEL: ${LEADERBOARD_LOG_LEVEL}
       PROMETHEUS_URL: ${PROMETHEUS_URL}
@@ -386,6 +388,7 @@ volumes:
   postgres-db:
   celestia-app-data:
   celestia-node-data:
+  leaderboard-cache:
 
 
 networks:
