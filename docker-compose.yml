@@ -352,6 +352,8 @@ services:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
     volumes:
       - postgres-db:/var/lib/postgresql/data
+    user: postgres
+    entrypoint: "postgres -N 999"
     networks:
       - celestialocal
     healthcheck:
